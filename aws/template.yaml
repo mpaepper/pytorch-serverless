@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Creates the Lambda function and API for the PyTorch image prediction for CIFAR.
+
+Parameters: 
+  S3Bucket: 
+    Type: String
+    Default: mp-pytorch-serverless
+    Description: S3 bucket used for the model parameters
+  Model: 
+    Type: String
+    Default: model.tar.gz
+    Description: Compressed model parameters and classes
+  LambdaLayerArn:
+    Type: String
+    Default: "arn:aws:lambda:eu-central-1:934676248949:layer:pytorchv1-py36:1"
+    Description: The lambda layer to load the pytorch dependencies
+
+Globals:
+    Function:
+        Timeout: 30
+
+Resources:
+  ImagePredictFunction:
+      Type: AWS::Serverless::Function
+      Properties:
+          CodeUri: pytorch/
+          Handler: prediction.lambda_handler
+          Runtime: python3.6
+          MemorySize: 256
+          Environment:
+            Variables:
+              S3_BUCKET: !Ref S3Bucket
+              MODEL: !Ref Model
+          Policies:
+            - S3ReadPolicy:
+                BucketName: !Ref S3Bucket
+          Layers:
+            - !Ref LambdaLayerArn 
+          Events:
+              ImagePredict:
+                  Type: Api
+                  Properties:
+                      Path: /image_classification
+                      Method: post
+
+Outputs:
+    ImagePredictApi:
+      Description: "API Gateway endpoint URL for Prod stage for ImagePredictFunction"
+      Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/image_classification/"
+
+    ImagePredictFunction:
+      Description: "ImagePredict Lambda Function ARN"
+      Value: !GetAtt ImagePredictFunction.Arn
+
+    ImagePredictFunctionIamRole:
+      Description: "Implicit IAM Role created for ImagePredictFunction"
+      Value: !GetAtt ImagePredictFunctionRole.Arn                        
