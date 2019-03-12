@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates the Lambda function and API for the PyTorch image prediction
+  for CIFAR.
+Globals:
+  Function:
+    Timeout: 30
+Outputs:
+  ImagePredictApi:
+    Description: API Gateway endpoint URL for Prod stage for ImagePredictFunction
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/image_classification/
+  ImagePredictFunction:
+    Description: ImagePredict Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - ImagePredictFunction
+      - Arn
+  ImagePredictFunctionIamRole:
+    Description: Implicit IAM Role created for ImagePredictFunction
+    Value:
+      Fn::GetAtt:
+      - ImagePredictFunctionRole
+      - Arn
+Parameters:
+  LambdaLayerArn:
+    Default: arn:aws:lambda:eu-central-1:934676248949:layer:pytorchv1-py36:1
+    Description: The lambda layer to load the pytorch dependencies
+    Type: String
+  Model:
+    Default: model.tar.gz
+    Description: Compressed model parameters and classes
+    Type: String
+  S3Bucket:
+    Default: mp-pytorch-serverless
+    Description: S3 bucket used for the model parameters
+    Type: String
+Resources:
+  ImagePredictFunction:
+    Properties:
+      CodeUri: s3://mp-pytorch-serverless/49ebbe9ae569a017a1ccbdb3a4fade0e
+      Environment:
+        Variables:
+          MODEL:
+            Ref: Model
+          S3_BUCKET:
+            Ref: S3Bucket
+      Events:
+        ImagePredict:
+          Properties:
+            Method: post
+            Path: /image_classification
+          Type: Api
+      Handler: prediction.lambda_handler
+      Layers:
+      - Ref: LambdaLayerArn
+      MemorySize: 256
+      Policies:
+      - S3ReadPolicy:
+          BucketName:
+            Ref: S3Bucket
+      Runtime: python3.6
+    Type: AWS::Serverless::Function
+Transform: AWS::Serverless-2016-10-31
